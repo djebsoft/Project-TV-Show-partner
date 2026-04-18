@@ -33,6 +33,7 @@ function makePageForEpisodes(episodeList) {
     card.innerHTML = `
       <div class="episode-header">
         <h2>${episodeCode}</h2>
+        <p class="episode-numbers">Season ${episode.season} • Episode ${episode.number}</p>
       </div>
       <div class="episode-image">
         <img src="${episode.image.medium}" alt="${episode.name}">

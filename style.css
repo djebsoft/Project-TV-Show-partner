@@ -35,7 +35,9 @@ body {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .episode-card:hover {
@@ -53,6 +55,12 @@ body {
 .episode-header h2 {
   font-size: 1.5em;
   margin: 0;
+}
+
+.episode-numbers {
+  margin: 5px 0 0 0;
+  font-size: 0.9em;
+  opacity: 0.9;
 }
 
 .episode-image {
