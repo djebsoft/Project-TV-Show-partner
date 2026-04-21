@@ -1,6 +1,35 @@
+function hideLoading() {
+  document.getElementById("loading-message").classList.add("hidden");
+}
+
+function showError(message) {
+  hideLoading();
+  const errorElem = document.getElementById("error-message");
+  errorElem.classList.remove("hidden");
+  errorElem.textContent = `Error loading episodes: ${message}`;
+}
+
 function setup() {
-  const allEpisodes = getAllEpisodes();
-  renderEpisodes(allEpisodes);
+  const API_URL = "https://api.tvmaze.com/shows/82/episodes";
+
+  fetch(API_URL)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((episodes) => {
+      if (!Array.isArray(episodes) || episodes.length === 0) {
+        showError("No episodes found");
+        return;
+      }
+      hideLoading();
+      renderEpisodes(episodes);
+    })
+    .catch((error) => {
+      showError(error.message);
+    });
 }
 
 function createEpisodeCode(season, number) {

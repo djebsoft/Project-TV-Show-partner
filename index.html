@@ -10,6 +10,10 @@
 
   <body>
     <main id="root">
+      <div id="loading-message" class="loading-message">
+        <p>Loading episodes...</p>
+      </div>
+      <div id="error-message" class="error-message hidden"></div>
       <h1 id="episode-total">0 Episode(s)</h1>
       <p id="episode-count">Displaying 0 episode(s)</p>
       <section
@@ -34,10 +38,6 @@
       </p>
     </footer>
 
-    <!-- Loads a provided function called getAllEpisodes() which returns all episodes -->
-    <script src="episodes.js"></script>
-
-    <!-- Loads YOUR javascript code -->
     <script src="script.js"></script>
   </body>
 </html>
