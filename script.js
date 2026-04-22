@@ -99,12 +99,3 @@ function renderEpisodes(episodeList) {
 }
 
 window.onload = setup;
-
-/*      <p class="episode-numbers">Season ${episode.season} • Episode ${episode.number}</p>*/
-/*    <div class="episode-link">
-        <a href="${episode.url}" target="_blank" rel="noopener noreferrer">View on TVMaze</a>
-    </div>*/
-//  const totalElem = document.getElementById("episode-total");
-//  totalElem.textContent = `${allEpisodes.length} Episode(s)`;
-
-/*modified*/
