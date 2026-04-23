@@ -6,6 +6,8 @@ const state = {
   filteredShows: [],
   currentShow: null,
   allEpisodes: [],
+  searchableShows: [],
+  searchableEpisodes: [],
 };
 
 function hideLoading() {
@@ -36,12 +38,17 @@ function fetchJsonOnce(url) {
     return fetchCache.get(url);
   }
 
-  const requestPromise = fetch(url).then((response) => {
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    return response.json();
-  });
+  const requestPromise = fetch(url)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .catch((error) => {
+      fetchCache.delete(url);
+      throw error;
+    });
 
   fetchCache.set(url, requestPromise);
   return requestPromise;
@@ -53,6 +60,25 @@ function stripHtmlTags(value) {
   return temp.textContent || temp.innerText || "";
 }
 
+function createShowSearchText(show) {
+  const genres = (show.genres || []).join(" ");
+  const summary = stripHtmlTags(show.summary || "");
+  return `${show.name} ${genres} ${summary}`.toLowerCase();
+}
+
+function createEpisodeSearchText(episode) {
+  return `${episode.name} ${stripHtmlTags(episode.summary || "")}`.toLowerCase();
+}
+
+function createMetaLine(label, value) {
+  const line = document.createElement("p");
+  line.className = "show-meta";
+  const strong = document.createElement("strong");
+  strong.textContent = `${label}:`;
+  line.append(strong, ` ${value}`);
+  return line;
+}
+
 function createEpisodeCode(season, number) {
   return `S${String(season).padStart(2, "0")}E${String(number).padStart(2, "0")}`;
 }
@@ -61,30 +87,49 @@ function createShowCard(show) {
   const card = document.createElement("article");
   card.className = "show-card";
 
-  const genresText = Array.isArray(show.genres) && show.genres.length > 0
-    ? show.genres.join(", ")
-    : "Unknown";
-  const ratingText = show.rating && show.rating.average !== null
-    ? String(show.rating.average)
-    : "N/A";
+  const genresText =
+    Array.isArray(show.genres) && show.genres.length > 0
+      ? show.genres.join(", ")
+      : "Unknown";
+  const ratingText =
+    show.rating && show.rating.average !== null
+      ? String(show.rating.average)
+      : "N/A";
   const runtimeText = show.runtime ? `${show.runtime} min` : "Unknown";
   const imageSrc = show.image && show.image.medium ? show.image.medium : "";
 
-  card.innerHTML = `
-    <div class="show-image">
-      <img src="${imageSrc}" alt="${show.name}">
-    </div>
-    <div class="show-content">
-      <h2>
-        <button class="show-name-button" data-show-id="${show.id}">${show.name}</button>
-      </h2>
-      <p class="show-meta"><strong>Genres:</strong> ${genresText}</p>
-      <p class="show-meta"><strong>Status:</strong> ${show.status || "Unknown"}</p>
-      <p class="show-meta"><strong>Rating:</strong> ${ratingText}</p>
-      <p class="show-meta"><strong>Runtime:</strong> ${runtimeText}</p>
-      <div class="show-summary">${show.summary || "<p>No summary available.</p>"}</div>
-    </div>
-  `;
+  const imageWrapper = document.createElement("div");
+  imageWrapper.className = "show-image";
+  if (imageSrc) {
+    const image = document.createElement("img");
+    image.src = imageSrc;
+    image.alt = show.name;
+    imageWrapper.appendChild(image);
+  }
+
+  const content = document.createElement("div");
+  content.className = "show-content";
+
+  const heading = document.createElement("h2");
+  const nameButton = document.createElement("button");
+  nameButton.className = "show-name-button";
+  nameButton.type = "button";
+  nameButton.dataset.showId = String(show.id);
+  nameButton.textContent = show.name;
+  heading.appendChild(nameButton);
+
+  const genres = createMetaLine("Genres", genresText);
+  const status = createMetaLine("Status", show.status || "Unknown");
+  const rating = createMetaLine("Rating", ratingText);
+  const runtime = createMetaLine("Runtime", runtimeText);
+
+  const summary = document.createElement("div");
+  summary.className = "show-summary";
+  summary.textContent =
+    stripHtmlTags(show.summary || "") || "No summary available.";
+
+  content.append(heading, genres, status, rating, runtime, summary);
+  card.append(imageWrapper, content);
 
   return card;
 }
@@ -100,13 +145,9 @@ function renderShows(showsToRender) {
 function filterShows(searchTerm) {
   const normalized = searchTerm.trim().toLowerCase();
 
-  const filtered = state.allShows.filter((show) => {
-    const inName = show.name.toLowerCase().includes(normalized);
-    const inGenres = (show.genres || []).join(" ").toLowerCase().includes(normalized);
-    const inSummary = stripHtmlTags(show.summary).toLowerCase().includes(normalized);
-
-    return inName || inGenres || inSummary;
-  });
+  const filtered = state.searchableShows
+    .filter((entry) => entry.searchText.includes(normalized))
+    .map((entry) => entry.show);
 
   state.filteredShows = filtered;
   renderShows(filtered);
@@ -119,24 +160,47 @@ function createEpisodeCard(episode) {
   const episodeCode = createEpisodeCode(episode.season, episode.number);
   const imageSrc = episode.image ? episode.image.medium : "";
 
-  card.innerHTML = `
-    <div class="episode-header">
-      <h3>${episodeCode}</h3>
-      <p class="episode-numbers">Season ${episode.season} - Episode ${episode.number}</p>
-    </div>
-    <div class="episode-image">
-      <img src="${imageSrc}" alt="${episode.name}">
-    </div>
-    <div class="episode-name">
-      <h4>${episode.name}</h4>
-    </div>
-    <div class="episode-summary">
-      ${episode.summary || "<p>No summary available.</p>"}
-    </div>
-    <div class="episode-link">
-      <a href="${episode.url}" target="_blank" rel="noopener noreferrer">View on TVMaze</a>
-    </div>
-  `;
+  const header = document.createElement("div");
+  header.className = "episode-header";
+  const codeHeading = document.createElement("h3");
+  codeHeading.textContent = episodeCode;
+  const numbers = document.createElement("p");
+  numbers.className = "episode-numbers";
+  numbers.textContent = `Season ${episode.season} - Episode ${episode.number}`;
+  header.append(codeHeading, numbers);
+
+  const imageContainer = document.createElement("div");
+  imageContainer.className = "episode-image";
+  if (imageSrc) {
+    const image = document.createElement("img");
+    image.src = imageSrc;
+    image.alt = episode.name;
+    imageContainer.appendChild(image);
+  } else {
+    imageContainer.classList.add("hidden");
+  }
+
+  const nameContainer = document.createElement("div");
+  nameContainer.className = "episode-name";
+  const title = document.createElement("h4");
+  title.textContent = episode.name;
+  nameContainer.appendChild(title);
+
+  const summary = document.createElement("div");
+  summary.className = "episode-summary";
+  summary.textContent =
+    stripHtmlTags(episode.summary || "") || "No summary available.";
+
+  const linkContainer = document.createElement("div");
+  linkContainer.className = "episode-link";
+  const link = document.createElement("a");
+  link.href = episode.url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "View on TVMaze";
+  linkContainer.appendChild(link);
+
+  card.append(header, imageContainer, nameContainer, summary, linkContainer);
 
   return card;
 }
@@ -177,14 +241,14 @@ function applyEpisodeFilters() {
   const searchTerm = searchInput.value.trim().toLowerCase();
   const selectedEpisodeId = episodeSelect.value;
 
-  const filtered = state.allEpisodes.filter((episode) => {
-    const matchesSearch =
-      episode.name.toLowerCase().includes(searchTerm) ||
-      (episode.summary || "").toLowerCase().includes(searchTerm);
-    const matchesSelection = !selectedEpisodeId || String(episode.id) === selectedEpisodeId;
-
-    return matchesSearch && matchesSelection;
-  });
+  const filtered = state.searchableEpisodes
+    .filter((entry) => {
+      const matchesSearch = entry.searchText.includes(searchTerm);
+      const matchesSelection =
+        !selectedEpisodeId || String(entry.episode.id) === selectedEpisodeId;
+      return matchesSearch && matchesSelection;
+    })
+    .map((entry) => entry.episode);
 
   renderEpisodes(filtered);
 }
@@ -215,8 +279,13 @@ function loadEpisodesForShow(show) {
     .then((episodes) => {
       state.currentShow = show;
       state.allEpisodes = Array.isArray(episodes) ? episodes : [];
+      state.searchableEpisodes = state.allEpisodes.map((episode) => ({
+        episode,
+        searchText: createEpisodeSearchText(episode),
+      }));
 
-      document.getElementById("current-show-title").textContent = `${show.name} Episodes`;
+      document.getElementById("current-show-title").textContent =
+        `${show.name} Episodes`;
       document.getElementById("episode-search-input").value = "";
       populateEpisodeSelect(state.allEpisodes);
       applyEpisodeFilters();
@@ -233,6 +302,10 @@ function populateInitialShows(shows) {
   state.allShows = [...shows].sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
   );
+  state.searchableShows = state.allShows.map((show) => ({
+    show,
+    searchText: createShowSearchText(show),
+  }));
   state.filteredShows = state.allShows;
   renderShows(state.filteredShows);
 }
