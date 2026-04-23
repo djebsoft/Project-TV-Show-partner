@@ -27,6 +27,26 @@ body {
   padding-bottom: 120px;
 }
 
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.controls label {
+  font-weight: 700;
+}
+
+.controls select,
+.controls input {
+  min-width: 250px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
 #root {
   color: var(--color-dark);
   max-width: 1400px;
@@ -173,4 +193,15 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+@media (max-width: 700px) {
+  .episodes-container {
+    grid-template-columns: 1fr;
+  }
+
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
