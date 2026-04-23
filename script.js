@@ -1,71 +1,57 @@
-//You can edit ALL of the code here
-function setup() {
-  const allEpisodes = getAllEpisodes();
-  makePageForEpisodes(allEpisodes);
-}
-
 function formatEpisodeCode(season, number) {
   return `S${String(season).padStart(2, "0")}E${String(number).padStart(2, "0")}`;
+}
+
+function createEpisodeElement(episode) {
+  const card = document.createElement("article");
+
+  const title = document.createElement("h2");
+  title.textContent = `${episode.name} - ${formatEpisodeCode(episode.season, episode.number)}`;
+
+  const image = document.createElement("img");
+  image.src = episode.image ? episode.image.medium : "";
+  image.alt = `Image for ${episode.name}`;
+
+  const summary = document.createElement("div");
+  summary.innerHTML = episode.summary || "<p>No summary available.</p>";
+
+  const link = document.createElement("a");
+  link.href = episode.url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "View episode on TVMaze";
+
+  card.appendChild(title);
+  card.appendChild(image);
+  card.appendChild(summary);
+  card.appendChild(link);
+
+  return card;
 }
 
 function makePageForEpisodes(episodeList) {
   const rootElem = document.getElementById("root");
   rootElem.innerHTML = "";
 
-  const countElem = document.createElement("p");
-  countElem.textContent = `Displaying ${episodeList.length} episode(s)`;
-  rootElem.appendChild(countElem);
+  const heading = document.createElement("h1");
+  heading.textContent = `${episodeList.length} Episode(s)`;
+  rootElem.appendChild(heading);
 
-  const episodeContainer = document.createElement("div");
-  episodeContainer.classList.add("episode-container");
-
+  const container = document.createElement("section");
   episodeList.forEach((episode) => {
-    const episodeElem = document.createElement("article");
-    episodeElem.classList.add("episode-card");
-
-    const titleElem = document.createElement("h2");
-    const episodeCode = formatEpisodeCode(episode.season, episode.number);
-    titleElem.textContent = `${episode.name} (${episodeCode})`;
-
-    const imageElem = document.createElement("img");
-    imageElem.src = episode.image ? episode.image.medium : "";
-    imageElem.alt = `Image for ${episode.name}`;
-
-    const summaryElem = document.createElement("div");
-    summaryElem.innerHTML = episode.summary || "No summary available.";
-
-    const linkElem = document.createElement("a");
-    linkElem.href = episode.url;
-    linkElem.target = "_blank";
-    linkElem.rel = "noopener noreferrer";
-    linkElem.textContent = "View on TVMaze";
-
-    episodeElem.appendChild(titleElem);
-    episodeElem.appendChild(imageElem);
-    episodeElem.appendChild(summaryElem);
-    episodeElem.appendChild(linkElem);
-    episodeContainer.appendChild(episodeElem);
+    container.appendChild(createEpisodeElement(episode));
   });
+  rootElem.appendChild(container);
 
-  rootElem.appendChild(episodeContainer);
-
-  const creditElem = document.createElement("p");
-  creditElem.innerHTML =
+  const credit = document.createElement("p");
+  credit.innerHTML =
     'Data originally from <a href="https://tvmaze.com/" target="_blank" rel="noopener noreferrer">TVMaze.com</a>';
-  rootElem.appendChild(creditElem);
+  rootElem.appendChild(credit);
+}
+
+function setup() {
+  const allEpisodes = getAllEpisodes();
+  makePageForEpisodes(allEpisodes);
 }
 
 window.onload = setup;
-
-/*All episodes must be shown
-2. For each episode, _at least_ following must be displayed:
-   1. The name of the episode-name
-   2. The season number-season
-   3. The episode number-number
-   4. The medium-sized image for the episode-image {medium}
-   5. The summary text of the episode-summary
-3. Combine season number and episode number into an **episode code**:
-   1. Each part should be zero-padded to two digits.
-   2. Example: `S02E07` would be the code for the 7th episode of the 2nd season. `S2E7` would be incorrect.
-4. Your page should state somewhere that the data has (originally) come from [TVMaze.com](https://tvmaze.com/), and link back to that site (or the specific episode on that site). See [tvmaze.com/api#licensing](https://www.tvmaze.com/api#licensing).
-*/
