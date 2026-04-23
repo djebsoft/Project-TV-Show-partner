@@ -1,5 +1,7 @@
-const API_URL = "https://api.tvmaze.com/shows/82/episodes";
-let episodesPromise = null;
+const SHOWS_URL = "https://api.tvmaze.com/shows";
+/*let episodesPromise = null;*/ //TO DELETE
+const showsCache = { data: null };
+const episodesCache = {};
 
 function hideLoading() {
   document.getElementById("loading-message").classList.add("hidden");
@@ -18,26 +20,36 @@ function clearError() {
   errorElem.textContent = "";
 }
 
-function fetchEpisodesOnce() {
-  if (episodesPromise) {
-    return episodesPromise;
-  }
+function fetchShowsOnce() {
+  if (showsCache.data) return Promise.resolve(showsCache.data);
 
-  episodesPromise = fetch(API_URL)
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
+  return fetch(SHOWS_URL)
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch shows");
+      return res.json();
+    })
+    .then((shows) => {
+      // Sort alphabetically (case-insensitive)
+      const sortedShows = shows.sort((a, b) =>
+        a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+      );
+      showsCache.data = sortedShows;
+      return sortedShows;
+    });
+}
+
+function fetchEpisodesOnce(showId) {
+  if (episodesCache[showId]) return Promise.resolve(episodesCache[showId]);
+
+  return fetch(`https://api.tvmaze.com/shows/${showId}/episodes`)
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch episodes");
+      return res.json();
     })
     .then((episodes) => {
-      if (!Array.isArray(episodes) || episodes.length === 0) {
-        throw new Error("No episodes found");
-      }
+      episodesCache[showId] = episodes;
       return episodes;
     });
-
-  return episodesPromise;
 }
 
 function createEpisodeCode(season, number) {
@@ -93,7 +105,7 @@ function renderEpisodes(episodeList, totalCount) {
   episodesElem.replaceChildren(...episodeList.map(createEpisodeCard));
 }
 
-function populateSelect(episodes) {
+function populateEpisodeSelect(episodes) {
   const select = document.getElementById("episode-select");
   select.replaceChildren();
 
@@ -110,43 +122,99 @@ function populateSelect(episodes) {
   });
 }
 
+function populateShowSelect(shows) {
+  const select = document.getElementById("show-select");
+  select.replaceChildren();
+
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Select a show...";
+  select.appendChild(defaultOption);
+
+  shows.forEach((show) => {
+    const option = document.createElement("option");
+    option.value = show.id;
+    option.textContent = show.name;
+    select.appendChild(option);
+  });
+}
+
 function setup() {
-  const filterInput = document.getElementById("filter-input");
+  const showSelect = document.getElementById("show-select");
   const episodeSelect = document.getElementById("episode-select");
+  const filterInput = document.getElementById("filter-input");
 
-  fetchEpisodesOnce()
-    .then((allEpisodes) => {
+  let currentEpisodes = [];
+
+  // Helper to fetch and render episodes for a specific ID
+  function loadShowById(showId) {
+    if (!showId) return;
+
+    console.log(`Fetching episodes for show ID: ${showId}`);
+    document.getElementById("loading-message").classList.remove("hidden");
+
+    fetchEpisodesOnce(showId)
+      .then((episodes) => {
+        hideLoading();
+        clearError();
+
+        currentEpisodes = episodes.map((ep) => ({
+          ...ep,
+          _searchText:
+            `${ep.name} ${stripHtml(ep.summary || "")}`.toLowerCase(),
+        }));
+
+        populateEpisodeSelect(currentEpisodes);
+        filterInput.value = "";
+        renderEpisodes(currentEpisodes, currentEpisodes.length);
+        console.log("Episodes rendered successfully.");
+      })
+      .catch((err) => {
+        console.error("Error loading episodes:", err);
+        showError(err.message);
+      });
+  }
+
+  // 1. Load the shows list
+  console.log("Fetching shows list...");
+  fetchShowsOnce()
+    .then((shows) => {
+      console.log(`Loaded ${shows.length} shows.`);
+      populateShowSelect(shows);
       hideLoading();
-      clearError();
-      populateSelect(allEpisodes);
 
-      const searchableEpisodes = allEpisodes.map((episode) => ({
-        ...episode,
-        _searchText: createSearchText(episode),
-      }));
+      // 2. Default to "2 Broke Girls" (ID: 1338)
+      const defaultShowId = "1338";
 
-      function applyFilters() {
-        const searchTerm = filterInput.value.toLowerCase();
-        const selectedId = episodeSelect.value;
+      // We set the value in the dropdown
+      showSelect.value = defaultShowId;
 
-        const filtered = searchableEpisodes.filter((episode) => {
-          const matchesSearch = episode._searchText.includes(searchTerm);
-          const matchesSelection =
-            !selectedId || String(episode.id) === selectedId;
-          return matchesSearch && matchesSelection;
-        });
-
-        renderEpisodes(filtered, allEpisodes.length);
-      }
-
-      filterInput.addEventListener("input", applyFilters);
-      episodeSelect.addEventListener("change", applyFilters);
-
-      renderEpisodes(allEpisodes, allEpisodes.length);
+      // 3. Force the load immediately
+      loadShowById(defaultShowId);
     })
-    .catch((error) => {
-      showError(error.message);
+    .catch((err) => {
+      console.error("Error loading shows:", err);
+      showError(err.message);
     });
+
+  // Listeners
+  showSelect.addEventListener("change", (e) => loadShowById(e.target.value));
+
+  function applyFilters() {
+    const searchTerm = filterInput.value.toLowerCase();
+    const selectedEpId = episodeSelect.value;
+
+    const filtered = currentEpisodes.filter((ep) => {
+      const matchesSearch = ep._searchText.includes(searchTerm);
+      const matchesSelection = !selectedEpId || String(ep.id) === selectedEpId;
+      return matchesSearch && matchesSelection;
+    });
+
+    renderEpisodes(filtered, currentEpisodes.length);
+  }
+
+  filterInput.addEventListener("input", applyFilters);
+  episodeSelect.addEventListener("change", applyFilters);
 }
 
 window.onload = setup;
